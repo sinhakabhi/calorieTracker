@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Themed (monochrome) icon: the same ring shape in a single colour. -->
+    <path
+        android:pathData="M54.00,33.00 A21.0,21.0 0 1,1 54.00,75.00 A21.0,21.0 0 1,1 54.00,33.00"
+        android:strokeWidth="9.0"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.35"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54.00,33.00 A21.0,21.0 0 1,1 33.00,54.00"
+        android:strokeWidth="9.0"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

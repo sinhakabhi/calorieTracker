@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------
+# Secrets and machine-specific config (never commit these)
+# ---------------------------------------------------------------
+# Holds sdk.dir and GEMINI_API_KEY.
+local.properties
+secrets.properties
+*.env
+.env*
+# Release signing keys and their passwords
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+# Google / Firebase service config and service-account credentials
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*.p12
+*.pem
+*.key
+
+# ---------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------
+build/
+.gradle/
+.kotlin/
+.externalNativeBuild/
+.cxx/
+captures/
+# Packaged apps (build them from source instead of committing)
+*.apk
+*.aab
+*.ap_
+*.dex
+output-metadata.json
+# Release mapping and native debug symbols
+mapping.txt
+*.so.dbg
+
+# ---------------------------------------------------------------
+# IDEs and editors
+# ---------------------------------------------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.fleet/
+*.swp
+*~
+.navigation/
+
+# ---------------------------------------------------------------
+# OS files
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------
+# Logs, crash and memory dumps
+# ---------------------------------------------------------------
+*.log
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# ---------------------------------------------------------------
+# Keep: the Gradle wrapper jar is needed to build (./gradlew)
+# ---------------------------------------------------------------
+!gradle/wrapper/gradle-wrapper.jar

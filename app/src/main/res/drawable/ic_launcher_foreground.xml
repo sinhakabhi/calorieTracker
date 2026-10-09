@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The dashboard's calorie ring: a faint track and one continuous arc that changes
+         colour by macro (protein pink, carbs amber, fat green), rounded only at its two ends. -->
+    <path
+        android:pathData="M54.00,33.00 A21.0,21.0 0 1,1 54.00,75.00 A21.0,21.0 0 1,1 54.00,33.00"
+        android:strokeWidth="9.0"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.22"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54.00,33.00 A21.0,21.0 0 0,1 73.66,61.39"
+        android:strokeWidth="9.0"
+        android:strokeColor="#FF5F8F"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M73.73,61.18 A21.0,21.0 0 0,1 41.78,71.08"
+        android:strokeWidth="9.0"
+        android:strokeColor="#FFB547"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M41.95,71.20 A21.0,21.0 0 0,1 33.00,54.00"
+        android:strokeWidth="9.0"
+        android:strokeColor="#34D399"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M28.50,54.00 a4.5,4.5 0 1,0 9.0,0 a4.5,4.5 0 1,0 -9.0,0"
+        android:fillColor="#34D399" />
+    <path
+        android:pathData="M49.50,33.00 a4.5,4.5 0 1,0 9.0,0 a4.5,4.5 0 1,0 -9.0,0"
+        android:fillColor="#FF5F8F" />
+</vector>
