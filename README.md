@@ -1,6 +1,6 @@
-# Calorie Tracker
+# Veyra
 
-An Android app for tracking food, water, training and progress (v2.0). Kotlin + Jetpack Compose,
+Veyra is an Android app for tracking food, water, training and progress (v2.0). Kotlin + Jetpack Compose,
 all data stored on the phone with Room, and optional AI help (Gemini free tier) for estimating meals,
 filling in the profile and planning training. No backend: there is nothing to deploy.
 
@@ -72,7 +72,7 @@ In the [Google Cloud console](https://console.cloud.google.com), in the project 
 
 1. **Google Auth Platform → Branding:** app name and support email; audience **External**; add testers
    under **Test users** (while the app is in testing).
-2. **Clients → Create client → Android:** package `com.example.calorietracker` and the SHA-1 of every
+2. **Clients → Create client → Android:** package `com.veyra.app` and the SHA-1 of every
    key that signs builds you install: debug (`keytool -list -v -keystore ~/.android/debug.keystore
    -alias androiddebugkey -storepass android`) and release (`keytool -list -v -keystore release.jks
    -alias calorietracker`).

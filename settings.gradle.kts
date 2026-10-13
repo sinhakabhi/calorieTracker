@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CalorieTracker"
+rootProject.name = "Veyra"
 include(":app")

@@ -8,13 +8,13 @@
     <!-- enableOnBackInvokedCallback="false" turns off the predictive back "peek" animation so the
          back gesture behaves exactly like the on-screen back arrow (same pop, same transition). -->
     <application
-        android:name=".CalorieTrackerApp"
+        android:name=".VeyraApp"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CalorieTracker">
+        android:theme="@style/Theme.Veyra">
         <activity
             android:name=".MainActivity"
             android:exported="true"

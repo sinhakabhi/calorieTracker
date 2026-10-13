@@ -6,14 +6,23 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Firebase (used for the tester allowlist) is only wired up when app/google-services.json exists,
+// so the project still builds without a Firebase project.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // GEMINI_API_KEY lives in local.properties (git-ignored) and is exposed as BuildConfig.GEMINI_API_KEY.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
 val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY", "").trim()
-// OAuth "Web application" client ID from Google Cloud, used for Sign in with Google.
+// OAuth "Web application" client ID from Google Cloud, used for Sign in with Google. Optional when
+// google-services.json provides one (Firebase console → Authentication → Google enabled).
 val googleWebClientId: String = localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "").trim()
+// Tester builds: require Google sign-in and an email on the Remote Config allowlist.
+val inviteOnly: Boolean = localProperties.getProperty("INVITE_ONLY", "false").trim().toBoolean()
 
 // Release signing key, from keystore.properties (git-ignored). Without it, release builds are unsigned.
 val keystoreProperties = Properties().apply {
@@ -22,18 +31,19 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.example.calorietracker"
+    namespace = "com.veyra.app"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.calorietracker"
+        applicationId = "com.veyra.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("boolean", "INVITE_ONLY", inviteOnly.toString())
     }
 
     signingConfigs {
@@ -82,6 +92,8 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.androidx.work.runtime)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.config)
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
