@@ -18,6 +18,12 @@ import java.net.UnknownHostException
  */
 const val GEMINI_MODEL = "gemini-3.5-flash-lite"
 
+/**
+ * Tried in order when [GEMINI_MODEL] is overloaded (503s, timeouts) — free-tier models often are at
+ * peak times. A different model generation runs on separate capacity. Keep these free-tier too.
+ */
+val GEMINI_FALLBACK_MODELS = listOf("gemini-2.5-flash-lite")
+
 sealed interface GeminiResult<out T> {
     data class Success<T>(val value: T) : GeminiResult<T>
 
@@ -166,56 +172,89 @@ class GeminiClient(
         if (!hasApiKey) return GeminiResult.Error(MISSING_KEY_MESSAGE)
         rateLimiter.tryAcquire()?.let { return GeminiResult.Error(it) }
 
+        val request = buildRequest(systemPrompt, userText, schema, maxOutputTokens, temperature)
+        // Try the main model, then the backups if it's overloaded. One user action counts as
+        // one request against the app's own limits, however many models are tried.
+        for (model in listOf(GEMINI_MODEL) + GEMINI_FALLBACK_MODELS) {
+            when (val response = send(model, request)) {
+                is Response.Ok -> {
+                    val text = GeminiParser.extractText(response.body)
+                        ?: return GeminiResult.Error("The AI couldn't answer that. Try rewording it.")
+                    val value = parse(text)
+                        ?: return GeminiResult.Error("Couldn't read the AI's answer. Try again or fill in the fields manually.")
+                    return GeminiResult.Success(value)
+                }
+                is Response.Busy -> Log.w(TAG, "Model $model busy (${response.reason}); trying the next one")
+                is Response.Failed -> return response.error
+            }
+        }
+        return GeminiResult.Error("The AI is very busy right now. Please try again in a minute.")
+    }
+
+    /** The outcome of one HTTP call to one model. */
+    private sealed interface Response {
+        data class Ok(val body: String) : Response
+        /** Overloaded, timed out or temporarily unavailable: worth trying another model. */
+        data class Busy(val reason: String) : Response
+        /** Won't be fixed by another model (bad key, quota, no internet…). */
+        data class Failed(val error: GeminiResult.Error) : Response
+    }
+
+    private fun send(model: String, request: String): Response {
         val connection = try {
-            URL(ENDPOINT).openConnection() as HttpURLConnection
+            URL(endpoint(model)).openConnection() as HttpURLConnection
         } catch (e: IOException) {
             Log.w(TAG, "Could not open connection", e)
-            return GeminiResult.Error("Could not reach the AI service. Check your connection and try again.")
+            return Response.Failed(GeminiResult.Error("Could not reach the AI service. Check your connection and try again."))
         }
         return try {
             connection.requestMethod = "POST"
             connection.connectTimeout = 15_000
-            connection.readTimeout = 60_000
+            // Overloaded models can take a minute just to say "busy"; give up sooner and fall back.
+            connection.readTimeout = READ_TIMEOUT_MS
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setRequestProperty("x-goog-api-key", apiKey)
-            connection.outputStream.use {
-                it.write(buildRequest(systemPrompt, userText, schema, maxOutputTokens, temperature).toByteArray())
-            }
+            connection.outputStream.use { it.write(request.toByteArray()) }
 
             val code = connection.responseCode
             val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }
                 .orEmpty()
-
-            if (code !in 200..299) return errorFor(code, body)
-
-            val text = GeminiParser.extractText(body)
-                ?: return GeminiResult.Error(
-                    "The AI couldn't answer that. Try rewording it."
-                )
-            val value = parse(text)
-                ?: return GeminiResult.Error("Couldn't read the AI's answer. Try again or fill in the fields manually.")
-            GeminiResult.Success(value)
+            when {
+                code in 200..299 -> Response.Ok(body)
+                // 404 is included because overloaded backends sometimes answer with a bare 404.
+                code in TRANSIENT_CODES -> Response.Busy("HTTP $code").also { logApiError(model, code, body) }
+                else -> Response.Failed(errorFor(model, code, body))
+            }
         } catch (e: UnknownHostException) {
-            GeminiResult.Error("No internet connection. Check Wi-Fi or mobile data and try again.")
+            Response.Failed(GeminiResult.Error("No internet connection. Check Wi-Fi or mobile data and try again."))
         } catch (e: SocketTimeoutException) {
-            GeminiResult.Error("The AI took too long to respond. Check your connection and try again.")
+            Response.Busy("timed out")
         } catch (e: IOException) {
-            GeminiResult.Error("Network error: ${e.message ?: "unknown"}. Check your connection and try again.")
+            Response.Failed(GeminiResult.Error("Network error: ${e.message ?: "unknown"}. Check your connection and try again."))
         } finally {
             connection.disconnect()
         }
     }
 
-    private fun errorFor(code: Int, body: String): GeminiResult.Error {
+    private fun logApiError(model: String, code: Int, body: String) {
+        val apiMessage = try {
+            JSONObject(body).optJSONObject("error")?.optString("message").orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        Log.w(TAG, "HTTP $code from model $model: $apiMessage")
+    }
+
+    private fun errorFor(model: String, code: Int, body: String): GeminiResult.Error {
         val apiMessage = try {
             JSONObject(body).optJSONObject("error")?.optString("message").orEmpty()
         } catch (e: Exception) {
             ""
         }
         // Full details for the developer; the UI only gets a generic message.
-        Log.w(TAG, "HTTP $code from model $GEMINI_MODEL: $apiMessage")
+        logApiError(model, code, body)
         val message = when {
             code == 429 ->
                 "AI limit reached for now. Wait a minute and try again."
@@ -223,10 +262,6 @@ class GeminiClient(
                 "AI features aren't set up correctly (invalid API key)."
             code == 401 || code == 403 ->
                 "AI features aren't set up correctly (API key rejected)."
-            code == 404 ->
-                "AI features aren't set up correctly (model not found)."
-            code >= 500 ->
-                "The AI service is having problems right now. Try again in a little while."
             else ->
                 "AI request failed (error $code). Try again later."
         }
@@ -265,8 +300,14 @@ class GeminiClient(
     }
 
     companion object {
-        private const val ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent"
+        private fun endpoint(model: String) =
+            "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
+
+        /** Per-model wait before falling back; normal answers take 1–5 s. */
+        private const val READ_TIMEOUT_MS = 25_000
+
+        /** Responses that mean "busy right now", so another model is worth a try. */
+        private val TRANSIENT_CODES = setOf(404, 500, 502, 503, 504)
 
         private const val TAG = "AiClient"
         /** Meal and profile answers are ~60–150 tokens. */

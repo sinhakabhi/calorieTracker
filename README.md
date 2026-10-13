@@ -43,7 +43,8 @@ Also:
 3. Debug build on a connected phone: `./gradlew installDebug`. Tests: `./gradlew testDebugUnitTest`.
 
 The app works without a Gemini key; the AI buttons then explain that AI isn't set up.
-To change the model, edit `GEMINI_MODEL` in `network/GeminiClient.kt`. Stick to Flash / Flash-Lite
+To change the model, edit `GEMINI_MODEL` in `network/GeminiClient.kt`. If it is overloaded (503s or
+timeouts, common on the free tier at peak times) the app falls back to `GEMINI_FALLBACK_MODELS`. Stick to Flash / Flash-Lite
 models, which are the free-tier ones.
 
 ### Release build (for testers)
