@@ -13,14 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.calorietracker.data.DayCalories
-import com.example.calorietracker.ui.theme.Brand
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -31,6 +28,7 @@ import java.util.Locale
  */
 @Composable
 fun WeeklyBarChart(days: List<DayCalories>, targetKcal: Int, modifier: Modifier = Modifier) {
+    val barColor = MaterialTheme.colorScheme.primary
     val overColor = MaterialTheme.colorScheme.error
     val emptyColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val targetLineColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -41,7 +39,7 @@ fun WeeklyBarChart(days: List<DayCalories>, targetKcal: Int, modifier: Modifier 
             // Leave headroom above the tallest bar or the target line.
             val maxValue = maxOf(days.maxOf { it.calories }, targetKcal) * 1.15f
             val slot = size.width / days.size
-            val barWidth = slot * 0.6f
+            val barWidth = slot * 0.5f
 
             days.forEachIndexed { index, day ->
                 val left = index * slot + (slot - barWidth) / 2
@@ -51,17 +49,12 @@ fun WeeklyBarChart(days: List<DayCalories>, targetKcal: Int, modifier: Modifier 
                 } else {
                     val barHeight = size.height * (day.calories / maxValue)
                     val top = size.height - barHeight
-                    val brush = if (day.calories > targetKcal) {
-                        SolidColor(overColor)
-                    } else {
-                        Brush.verticalGradient(listOf(Brand.Pink, Brand.Violet), startY = top, endY = size.height)
-                    }
                     drawRoundRect(
-                        brush = brush,
+                        color = if (day.calories > targetKcal) overColor else barColor,
                         topLeft = Offset(left, top),
                         size = Size(barWidth, barHeight),
-                        cornerRadius = CornerRadius(8.dp.toPx()),
-                        alpha = if (index == days.lastIndex) 1f else 0.4f,
+                        cornerRadius = CornerRadius(6.dp.toPx()),
+                        alpha = if (index == days.lastIndex) 1f else 0.45f,
                     )
                 }
             }

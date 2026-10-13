@@ -32,6 +32,12 @@ class AiRateLimiter(
 
     private val recent = ArrayDeque<Long>()
 
+    /** Requests used so far today (for display). */
+    fun usedToday(): Int {
+        val today = Instant.ofEpochMilli(now()).atZone(zone).toLocalDate().toEpochDay()
+        return store.read()?.takeIf { it.first == today }?.second ?: 0
+    }
+
     /**
      * Records a request if it is allowed and returns null; otherwise returns a message
      * explaining why it was blocked (and records nothing).

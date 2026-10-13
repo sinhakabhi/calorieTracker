@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.calorietracker.data.CalorieRepository
 import com.example.calorietracker.data.Profile
-import com.example.calorietracker.data.WeightEntry
 import com.example.calorietracker.domain.ActivityLevel
 import com.example.calorietracker.domain.CalorieCalculator
 import com.example.calorietracker.domain.Goal
@@ -15,11 +14,9 @@ import com.example.calorietracker.network.GeminiClient
 import com.example.calorietracker.network.GeminiResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,9 +79,6 @@ class ProfileViewModel(
 
     private val _assist = MutableStateFlow(ProfileAssistState())
     val assist: StateFlow<ProfileAssistState> = _assist.asStateFlow()
-
-    val weightHistory: StateFlow<List<WeightEntry>> = repository.weightHistory
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         // Pre-fill the form with the saved profile and latest weight, if any.
@@ -161,10 +155,6 @@ class ProfileViewModel(
             )
             onSaved()
         }
-    }
-
-    fun deleteWeight(entry: WeightEntry) {
-        viewModelScope.launch { repository.deleteWeight(entry) }
     }
 }
 

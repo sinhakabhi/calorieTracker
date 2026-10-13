@@ -11,10 +11,15 @@ package com.example.calorietracker.network
 object AiGuardrails {
 
     const val MAX_INPUT_CHARS = 300
+
+    /** Training goals need more room (schedule, equipment, injuries). */
+    const val MAX_WORKOUT_CHARS = 500
     private const val MIN_INPUT_CHARS = 3
 
     const val NOT_FOOD_MESSAGE =
         "That doesn't look like a food description. Describe what you ate, e.g. \"2 rotis and a bowl of dal\"."
+    const val NOT_FITNESS_MESSAGE =
+        "That doesn't look like a training goal. Describe what you train for, e.g. \"Gym 4 days a week to get lean\"."
     const val NOT_PROFILE_MESSAGE =
         "That doesn't look like a description of you. Mention things like your age, height, weight and how often you exercise."
 
@@ -47,6 +52,29 @@ object AiGuardrails {
         ignoreCase,
     )
 
+    private val fitnessHints = Regex(
+        """\b(gym|work ?outs?|train(ing)?|exercis(e|es|ing)|fitness|fit|strength|strong|muscle|lean|bulk|""" +
+            """cut(ting)?|tone|toning|fat|weight|lift(ing)?|powerlifting|bodybuilding|hypertrophy|cardio|run(ning)?|""" +
+            """jog(ging)?|marathon|half[- ]marathon|5k|10k|sprint|hyrox|crossfit|calisthenics|yoga|pilates|mobility|""" +
+            """stretch(ing)?|swim(ming)?|cycl(e|ing)|row(ing)?|hike|hiking|walk(ing)?|sports?|football|cricket|""" +
+            """badminton|tennis|basketball|boxing|mma|martial|abs|core|legs|arms|chest|endurance|stamina|reps?|""" +
+            """dumbbells?|kettlebells?|barbell|resistance bands?|athlete|race)\b""",
+        ignoreCase,
+    )
+
+    /** Checks a "what do you want to train for?" goal. Plan requests ("Create a 4-day plan…") are fine here. */
+    fun checkWorkout(text: String): String? =
+        checkCommon(text, NOT_FITNESS_MESSAGE, maxChars = MAX_WORKOUT_CHARS, blockAssistantRequests = false)
+            ?: if (fitnessHints.containsMatchIn(text)) null else NOT_FITNESS_MESSAGE
+
+    /**
+     * Checks an instruction for changing one day of an existing plan ("make it 30 minutes",
+     * "swap squats for something knee-friendly"). The topic is already training, so no
+     * keyword is required; junk, links, code and prompt injection are still blocked.
+     */
+    fun checkPlanEdit(text: String): String? =
+        checkCommon(text, NOT_FITNESS_MESSAGE, blockAssistantRequests = false)
+
     /** Checks a "what did you eat?" description. */
     fun checkMeal(text: String): String? = checkCommon(text, NOT_FOOD_MESSAGE)
 
@@ -55,13 +83,18 @@ object AiGuardrails {
         checkCommon(text, NOT_PROFILE_MESSAGE)
             ?: if (profileHints.containsMatchIn(text)) null else NOT_PROFILE_MESSAGE
 
-    private fun checkCommon(raw: String, offTopicMessage: String): String? {
+    private fun checkCommon(
+        raw: String,
+        offTopicMessage: String,
+        maxChars: Int = MAX_INPUT_CHARS,
+        blockAssistantRequests: Boolean = true,
+    ): String? {
         val text = raw.trim()
         return when {
             text.length < MIN_INPUT_CHARS -> "Describe it in a few words first."
-            text.length > MAX_INPUT_CHARS -> "Keep it under $MAX_INPUT_CHARS characters."
-            links.containsMatchIn(text) || code.containsMatchIn(text) ||
-                injection.containsMatchIn(text) || offTopicRequest.containsMatchIn(text) -> offTopicMessage
+            text.length > maxChars -> "Keep it under $maxChars characters."
+            links.containsMatchIn(text) || code.containsMatchIn(text) || injection.containsMatchIn(text) ||
+                (blockAssistantRequests && offTopicRequest.containsMatchIn(text)) -> offTopicMessage
             looksLikeGibberish(text) -> offTopicMessage
             else -> null
         }

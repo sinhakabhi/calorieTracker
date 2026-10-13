@@ -4,11 +4,11 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-enum class MealType(val label: String, val emoji: String) {
-    BREAKFAST("Breakfast", "🍳"),
-    LUNCH("Lunch", "🍛"),
-    DINNER("Dinner", "🍲"),
-    SNACK("Snack", "🍎"),
+enum class MealType(val label: String) {
+    BREAKFAST("Breakfast"),
+    LUNCH("Lunch"),
+    DINNER("Dinner"),
+    SNACK("Snack"),
 }
 
 @Entity(tableName = "meals", indices = [Index("epochDay")])

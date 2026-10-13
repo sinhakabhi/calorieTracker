@@ -4,397 +4,257 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.calorietracker.domain.ActivityLevel
-import com.example.calorietracker.domain.CalorieCalculator
-import com.example.calorietracker.domain.Goal
-import com.example.calorietracker.domain.Sex
-import com.example.calorietracker.network.AiGuardrails
-import com.example.calorietracker.ui.components.GradientButton
-import com.example.calorietracker.ui.components.OptionCard
-import com.example.calorietracker.ui.components.SectionCard
+import com.example.calorietracker.BuildConfig
+import com.example.calorietracker.network.AiRateLimiter
+import com.example.calorietracker.ui.components.AppCard
+import com.example.calorietracker.ui.components.IconBadge
+import com.example.calorietracker.ui.components.MacroColors
+import com.example.calorietracker.ui.components.MainTab
+import com.example.calorietracker.ui.components.MainTabsBar
+import com.example.calorietracker.ui.components.RowDivider
+import com.example.calorietracker.ui.components.SectionHeader
+import com.example.calorietracker.ui.components.Spacing
+import com.example.calorietracker.ui.components.StatBlock
 import com.example.calorietracker.ui.formatKcal
 import com.example.calorietracker.ui.formatLitres
 import com.example.calorietracker.ui.formatNumber
-import com.example.calorietracker.ui.theme.Brand
-import com.example.calorietracker.viewmodel.ProfileAssistState
-import com.example.calorietracker.viewmodel.ProfileForm
-import com.example.calorietracker.viewmodel.ProfileViewModel
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import com.example.calorietracker.ui.theme.Accents
+import com.example.calorietracker.ui.theme.tabular
+import com.example.calorietracker.viewmodel.ProfileOverviewViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The Profile tab: who you are, your targets, your body & goal, and settings. */
 @Composable
-fun ProfileScreen(viewModel: ProfileViewModel, isOnboarding: Boolean, onDone: () -> Unit) {
-    val form by viewModel.form.collectAsStateWithLifecycle()
-    val weightHistory by viewModel.weightHistory.collectAsStateWithLifecycle()
-    val assist by viewModel.assist.collectAsStateWithLifecycle()
+fun ProfileScreen(
+    viewModel: ProfileOverviewViewModel,
+    onSelectTab: (MainTab) -> Unit,
+    onEditProfile: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    /** Null when Google sign-in isn't configured in this build. */
+    onSignIn: (() -> Unit)?,
+    onSignOut: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    var confirmSignOut by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { viewModel.refresh() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isOnboarding) "" else "Your profile") },
-                navigationIcon = {
-                    if (!isOnboarding) {
-                        IconButton(onClick = onDone) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surface) {
-                GradientButton(
-                    text = if (isOnboarding) "Get started" else "Save",
-                    onClick = { viewModel.save(onDone) },
-                    enabled = form.isValid,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    Scaffold(bottomBar = { MainTabsBar(MainTab.PROFILE, onSelectTab) }) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(horizontal = Spacing.page, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.item),
         ) {
-            if (isOnboarding) {
-                Column {
-                    Text("Let's get to know you", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        "We use this to work out how many calories you need each day.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            item { ScreenTitle(title = "Profile", subtitle = "Account and settings") }
 
-            AssistCard(
-                state = assist,
-                onTextChange = viewModel::updateAssistText,
-                onFill = viewModel::fillFromDescription,
-            )
-
-            SectionCard(title = "About you") {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Sex.entries.forEach { sex ->
-                        OptionCard(
-                            selected = form.sex == sex,
-                            onClick = { viewModel.update { it.copy(sex = sex) } },
-                            modifier = Modifier.weight(1f),
+            // Account
+            item {
+                val account = state.account
+                AppCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                sex.label,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.titleSmall,
+                                account?.initials?.takeIf { account.name.isNotBlank() } ?: "?",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimary,
                             )
                         }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                NumberField(
-                    label = "Age",
-                    suffix = "years",
-                    value = form.age,
-                    onValueChange = { v -> viewModel.update { it.copy(age = v) } },
-                    isError = form.age.isNotBlank() && !form.ageValid,
-                    errorText = "Enter an age from 13 to 100",
-                    decimal = false,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NumberField(
-                        label = "Height",
-                        suffix = "cm",
-                        value = form.heightCm,
-                        onValueChange = { v -> viewModel.update { it.copy(heightCm = v) } },
-                        isError = form.heightCm.isNotBlank() && !form.heightValid,
-                        errorText = "100–250 cm",
-                        modifier = Modifier.weight(1f),
-                    )
-                    NumberField(
-                        label = if (isOnboarding) "Weight" else "Today's weight",
-                        suffix = "kg",
-                        value = form.weightKg,
-                        onValueChange = { v -> viewModel.update { it.copy(weightKg = v) } },
-                        isError = form.weightKg.isNotBlank() && !form.weightValid,
-                        errorText = "30–300 kg",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (!isOnboarding) {
-                    Text(
-                        "Saving logs this weight for today.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            SectionCard(
-                title = "How active are you?",
-                subtitle = "Your resting burn is multiplied by this number to estimate what you burn in a full day.",
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ActivityLevel.entries.forEach { level ->
-                        OptionCard(
-                            selected = form.activity == level,
-                            onClick = { viewModel.update { it.copy(activity = level) } },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(level.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                Text("×${level.factor}", style = MaterialTheme.typography.labelLarge)
-                            }
-                            Text(level.description, style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                account?.name?.takeIf { it.isNotBlank() } ?: "Guest",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                account?.email ?: if (onSignIn != null) "Not signed in" else "Data stored on this phone",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (account?.isGuest != false && onSignIn != null) {
+                            TextButton(onClick = onSignIn) { Text("Sign in") }
                         }
                     }
                 }
             }
 
-            SectionCard(title = "Your goal") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Goal.entries.forEach { goal ->
-                        OptionCard(
-                            selected = form.goal == goal,
-                            onClick = { viewModel.update { it.copy(goal = goal) } },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(goal.label, style = MaterialTheme.typography.titleSmall)
-                                Text(goalAdjustmentText(goal), style = MaterialTheme.typography.bodySmall)
-                            }
+            // Targets
+            item { SectionHeader("Daily targets") }
+            item {
+                val targets = state.targets
+                AppCard {
+                    StatBlock(
+                        label = "Calories",
+                        value = targets?.let { formatKcal(it.kcal) } ?: "—",
+                        valueSuffix = "kcal per day",
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    RowDivider()
+                    Spacer(Modifier.height(14.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatBlock("Protein", targets?.macros?.proteinG?.toString() ?: "—", valueSuffix = "g", color = MacroColors.Protein, modifier = Modifier.weight(1f))
+                        StatBlock("Carbs", targets?.macros?.carbsG?.toString() ?: "—", valueSuffix = "g", color = MacroColors.Carbs, modifier = Modifier.weight(1f))
+                        StatBlock("Fat", targets?.macros?.fatG?.toString() ?: "—", valueSuffix = "g", color = MacroColors.Fat, modifier = Modifier.weight(1f))
+                        StatBlock("Water", targets?.let { formatLitres(it.waterMl) } ?: "—", valueSuffix = "L", color = Accents.Water, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            // Body & goal
+            item {
+                SectionHeader("Body & goal") {
+                    TextButton(onClick = onEditProfile) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Edit")
+                    }
+                }
+            }
+            item {
+                val profile = state.profile
+                AppCard(contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp)) {
+                    val rows = listOf(
+                        "Age" to (profile?.let { "${it.age} years" } ?: "—"),
+                        "Sex" to (profile?.sex?.label ?: "—"),
+                        "Height" to (profile?.let { "${formatNumber(it.heightCm)} cm" } ?: "—"),
+                        "Weight" to (state.latestWeight?.let { "${formatNumber(it.weightKg)} kg" } ?: "—"),
+                        "Activity" to (profile?.activityLevel?.label ?: "—"),
+                        "Goal" to (profile?.goal?.let { "${it.label} weight" } ?: "—"),
+                    )
+                    rows.forEachIndexed { index, (label, value) ->
+                        if (index > 0) RowDivider()
+                        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            Text(value, style = MaterialTheme.typography.bodyMedium.tabular())
                         }
                     }
                 }
             }
 
-            TargetBreakdownCard(form)
+            // Settings
+            item { SectionHeader("Settings") }
+            item {
+                val r = state.reminders
+                val on = listOfNotNull("Water".takeIf { r.water }, "Meals".takeIf { r.meals }, "Workouts".takeIf { r.workout })
+                AppCard(contentPadding = PaddingValues(0.dp)) {
+                    SettingsRow(
+                        icon = Icons.Outlined.Notifications,
+                        title = "Notifications",
+                        subtitle = if (on.isEmpty()) "Off" else on.joinToString(", "),
+                        onClick = onOpenNotifications,
+                    )
+                    RowDivider(Modifier.padding(start = 68.dp))
+                    SettingsRow(
+                        icon = Icons.Outlined.AutoAwesome,
+                        title = "AI usage today",
+                        subtitle = "${state.aiRequestsUsed} of ${AiRateLimiter.PER_DAY} requests · resets at midnight",
+                    )
+                    RowDivider(Modifier.padding(start = 68.dp))
+                    SettingsRow(
+                        icon = Icons.Outlined.Lock,
+                        title = "Privacy",
+                        subtitle = "Your data stays on this phone. Only text you send to AI leaves it.",
+                    )
+                }
+            }
 
-            if (!isOnboarding && weightHistory.isNotEmpty()) {
-                SectionCard(title = "Weight history") {
-                    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy")
-                    weightHistory.forEachIndexed { index, entry ->
-                        if (index > 0) HorizontalDivider()
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(LocalDate.ofEpochDay(entry.epochDay).format(formatter), modifier = Modifier.weight(1f))
-                            Text("${formatNumber(entry.weightKg)} kg", fontWeight = FontWeight.SemiBold)
-                            // Keep at least one entry: the daily target needs a weight.
-                            IconButton(onClick = { viewModel.deleteWeight(entry) }, enabled = weightHistory.size > 1) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete weight entry")
-                            }
-                        }
+            if (state.account?.isGuest == false) {
+                item {
+                    OutlinedButton(
+                        onClick = { confirmSignOut = true },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    ) {
+                        Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sign out", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
-        }
-    }
-}
-
-/** Lets the user describe themselves in one sentence and have Gemini fill in the form. */
-@Composable
-private fun AssistCard(state: ProfileAssistState, onTextChange: (String) -> Unit, onFill: () -> Unit) {
-    // A soft violet → pink wash so the AI card stands out from the plain form cards.
-    val wash = Brush.linearGradient(listOf(Brand.Violet.copy(alpha = 0.22f), Brand.Pink.copy(alpha = 0.18f)))
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .background(wash),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column {
-                Text("✨ Describe yourself", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            item {
                 Text(
-                    "AI will fill in the form for you. You can still edit everything below.",
+                    "Calorie Tracker ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
-            }
-            OutlinedTextField(
-                value = state.text,
-                onValueChange = { onTextChange(it.take(AiGuardrails.MAX_INPUT_CHARS)) },
-                supportingText = { Text("${state.text.length} / ${AiGuardrails.MAX_INPUT_CHARS}") },
-                placeholder = {
-                    Text("e.g. I'm a 27M, I work out 3–4 times a week, I weigh 100 kg, I'm 182 cm and want to get to 90 kg")
-                },
-                minLines = 3,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            GradientButton(
-                text = if (state.isLoading) "Reading…" else "Auto-fill with AI",
-                onClick = onFill,
-                enabled = state.text.isNotBlank() || state.isLoading,
-                loading = state.isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                "Only the text above is sent to the AI service.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            state.message?.let { Text("✓ $it", style = MaterialTheme.typography.bodyMedium) }
-            state.error?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
         }
     }
+
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            title = { Text("Sign out?") },
+            text = { Text("Your meals, plan and history stay on this phone and will be here when you sign back in.") },
+            confirmButton = {
+                TextButton(onClick = { confirmSignOut = false; onSignOut() }) {
+                    Text("Sign out", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancel") } },
+        )
+    }
 }
 
-private fun goalAdjustmentText(goal: Goal): String = when {
-    goal.adjustmentKcal > 0 -> "+${goal.adjustmentKcal} kcal"
-    goal.adjustmentKcal < 0 -> "−${-goal.adjustmentKcal} kcal"
-    else -> "±0 kcal"
-}
-
-/** Shows how the target is worked out: resting burn × activity ± goal. */
 @Composable
-private fun TargetBreakdownCard(form: ProfileForm) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brand.HeroGradient),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Your daily target", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.85f))
-            val bmr = form.previewBmr
-            val target = form.previewTarget
-            val macros = form.previewMacros
-            if (bmr == null || target == null || macros == null) {
-                Text("Fill in your age, height and weight to see it.", style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                return@Column
+private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)? = null) {
+    val content = @Composable {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon, MaterialTheme.colorScheme.primary, size = 36.dp)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(
-                "${formatKcal(target)} kcal",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-            )
-            Spacer(Modifier.height(4.dp))
-            BreakdownRow("Resting burn (BMR)", "${formatKcal(bmr)} kcal")
-            BreakdownRow("× ${form.activity.label}", "×${form.activity.factor}")
-            BreakdownRow("${form.goal.label} weight", goalAdjustmentText(form.goal))
-            if (target == CalorieCalculator.MIN_DAILY_KCAL) {
-                Text(
-                    "Raised to the ${formatKcal(CalorieCalculator.MIN_DAILY_KCAL)} kcal safe minimum.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
+            if (onClick != null) {
+                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MacroTargetChip("Protein", macros.proteinG, Modifier.weight(1f))
-                MacroTargetChip("Carbs", macros.carbsG, Modifier.weight(1f))
-                MacroTargetChip("Fat", macros.fatG, Modifier.weight(1f))
-            }
-            Text(
-                "Protein ${formatNumber(form.activity.proteinPerKg)} g per kg of body weight · " +
-                    "fat ${(CalorieCalculator.FAT_SHARE * 100).toInt()}% of calories · carbs the rest.\n" +
-                    "Water ${formatLitres(CalorieCalculator.waterTargetMl(form.weightValue!!))} L a day (35 ml per kg).",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.8f),
-            )
         }
     }
-}
-
-@Composable
-private fun MacroTargetChip(label: String, grams: Int, modifier: Modifier) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.16f))
-            .padding(vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("$grams g", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
-    }
-}
-
-@Composable
-private fun BreakdownRow(label: String, value: String) {
-    Row {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-    }
-}
-
-@Composable
-private fun NumberField(
-    label: String,
-    suffix: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    isError: Boolean,
-    errorText: String,
-    modifier: Modifier = Modifier.fillMaxWidth(),
-    decimal: Boolean = true,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        suffix = { Text(suffix) },
-        isError = isError,
-        supportingText = if (isError) ({ Text(errorText) }) else null,
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number),
-        modifier = modifier,
-    )
+    if (onClick != null) Surface(onClick = onClick, color = Color.Transparent) { content() } else content()
 }

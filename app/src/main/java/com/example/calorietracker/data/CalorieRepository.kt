@@ -1,9 +1,11 @@
 package com.example.calorietracker.data
 
 import com.example.calorietracker.domain.CalorieCalculator
+import com.example.calorietracker.domain.Goal
 import com.example.calorietracker.domain.MacroTargets
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
@@ -46,6 +48,10 @@ class CalorieRepository(private val dao: CalorieDao) {
 
     suspend fun deleteWeight(entry: WeightEntry) = dao.deleteWeight(entry)
 
+    /** Records [weightKg] for [date] (one reading per day; a second one that day replaces it). */
+    suspend fun logWeight(date: LocalDate, weightKg: Double) =
+        dao.upsertWeight(WeightEntry(date.toEpochDay(), weightKg))
+
     fun mealsForDay(date: LocalDate): Flow<List<Meal>> = dao.observeMealsForDay(date.toEpochDay())
 
     /** Calories for each of the 7 days ending on [endDate], oldest first, with 0 for empty days. */
@@ -61,6 +67,28 @@ class CalorieRepository(private val dao: CalorieDao) {
     fun waterForDay(date: LocalDate): Flow<Int> = dao.observeWaterMl(date.toEpochDay()).map { it ?: 0 }
 
     suspend fun addWater(date: LocalDate, deltaMl: Int) = dao.addWater(date.toEpochDay(), deltaMl)
+
+    /**
+     * A one-line description of the user for AI context, e.g.
+     * "Age 27, male, 182 cm, 100 kg, moderately active, goal: lose weight". Null without a profile.
+     */
+    suspend fun profileSummary(): String? {
+        val profile = profile.first() ?: return null
+        val weight = weightHistory.first().firstOrNull()?.weightKg
+        val goal = when (profile.goal) {
+            Goal.LOSE -> "lose weight"
+            Goal.MAINTAIN -> "maintain weight"
+            Goal.GAIN -> "gain weight"
+        }
+        return listOfNotNull(
+            "Age ${profile.age}",
+            profile.sex.label.lowercase(),
+            "${profile.heightCm.toBigDecimal().stripTrailingZeros().toPlainString()} cm",
+            weight?.let { "${it.toBigDecimal().stripTrailingZeros().toPlainString()} kg" },
+            profile.activityLevel.label.lowercase(),
+            "goal: $goal",
+        ).joinToString(", ")
+    }
 
     suspend fun getMeal(id: Long): Meal? = dao.getMeal(id)
 

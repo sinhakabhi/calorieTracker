@@ -14,10 +14,7 @@ class MainActivity : ComponentActivity() {
         val app = application as CalorieTrackerApp
         setContent {
             CalorieTrackerTheme {
-                AppNavigation(
-                    repository = app.repository,
-                    geminiClient = app.geminiClient,
-                )
+                AppNavigation(app)
             }
         }
     }

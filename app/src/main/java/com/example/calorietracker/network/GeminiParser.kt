@@ -1,11 +1,15 @@
 package com.example.calorietracker.network
 
+import com.example.calorietracker.data.DayDraft
+import com.example.calorietracker.data.ExerciseDraft
+import com.example.calorietracker.data.PlanDraft
 import com.example.calorietracker.domain.ActivityLevel
 import com.example.calorietracker.domain.CalorieCalculator
 import com.example.calorietracker.domain.Goal
 import com.example.calorietracker.domain.Sex
 import org.json.JSONException
 import org.json.JSONObject
+import java.time.DayOfWeek
 import kotlin.math.roundToInt
 
 /** What Gemini estimated for a meal description. */
@@ -36,6 +40,12 @@ data class ProfileExtraction(
         get() = age == null && sex == null && heightCm == null && weightKg == null && activity == null && goal == null
 }
 
+/** A parsed training-plan answer; [isFitness] is false when the request wasn't about training. */
+data class GeneratedPlan(val isFitness: Boolean, val draft: PlanDraft)
+
+/** A parsed single-day edit; [day] is null when [isFitness] is false. */
+data class GeneratedDay(val isFitness: Boolean, val day: DayDraft?)
+
 /** Defensive parsing of Gemini responses. Never throws. */
 object GeminiParser {
 
@@ -46,6 +56,14 @@ object GeminiParser {
     const val MAX_MACRO_G = 500.0
     const val MAX_NAME_CHARS = 60
     const val MAX_NOTE_CHARS = 300
+
+    // Limits for generated training plans.
+    const val MAX_EXERCISES_PER_DAY = 10
+    const val MAX_SETS = 20
+    private const val MAX_TITLE_CHARS = 60
+    private const val MAX_TARGET_CHARS = 40
+    private const val MAX_EXERCISE_NOTE_CHARS = 200
+    private const val MAX_PLAN_NOTES_CHARS = 800
 
     /**
      * Pulls the model's text out of a generateContent response body
@@ -118,6 +136,85 @@ object GeminiParser {
             null
         }
     }
+
+    /**
+     * Parses a weekly plan. Unknown or repeated days are skipped, blank exercises dropped, and
+     * every value clamped. Returns null if there's no JSON object, or a "fitness" answer has no days.
+     */
+    fun parseWorkoutPlan(text: String): GeneratedPlan? {
+        val json = extractJsonObject(text) ?: return null
+        return try {
+            val obj = JSONObject(json)
+            val isFitness = obj.optBoolean("is_fitness", true)
+            val days = mutableListOf<DayDraft>()
+            val daysArray = obj.optJSONArray("days")
+            for (i in 0 until (daysArray?.length() ?: 0)) {
+                val dayObj = daysArray!!.optJSONObject(i) ?: continue
+                val dayOfWeek = dayOfWeekOrNull(dayObj.optString("day")) ?: continue
+                if (days.any { it.dayOfWeek == dayOfWeek }) continue
+                days += parseDayObject(dayObj, dayOfWeek)
+            }
+            if (isFitness && days.isEmpty()) return null
+            GeneratedPlan(
+                isFitness = isFitness,
+                draft = PlanDraft(
+                    title = obj.cleanString("title", MAX_TITLE_CHARS).ifEmpty { "My training week" },
+                    notes = obj.cleanString("notes", MAX_PLAN_NOTES_CHARS),
+                    days = days.sortedBy { it.dayOfWeek },
+                ),
+            )
+        } catch (e: JSONException) {
+            null
+        }
+    }
+
+    /**
+     * Parses an AI edit of one day (same fields as a day in a weekly plan, without "day").
+     * Returns null if there's no JSON object.
+     */
+    fun parseDayEdit(text: String, dayOfWeek: DayOfWeek): GeneratedDay? {
+        val json = extractJsonObject(text) ?: return null
+        return try {
+            val obj = JSONObject(json)
+            if (!obj.optBoolean("is_fitness", true)) GeneratedDay(false, null)
+            else GeneratedDay(true, parseDayObject(obj, dayOfWeek))
+        } catch (e: JSONException) {
+            null
+        }
+    }
+
+    /** One day: blank exercises dropped, at most [MAX_EXERCISES_PER_DAY], every value clamped. */
+    private fun parseDayObject(dayObj: JSONObject, dayOfWeek: DayOfWeek): DayDraft {
+        val exercises = mutableListOf<ExerciseDraft>()
+        val exArray = dayObj.optJSONArray("exercises")
+        for (j in 0 until (exArray?.length() ?: 0)) {
+            if (exercises.size >= MAX_EXERCISES_PER_DAY) break
+            val ex = exArray!!.optJSONObject(j) ?: continue
+            val name = ex.cleanString("name", MAX_TITLE_CHARS)
+            if (name.isEmpty()) continue
+            exercises += ExerciseDraft(
+                name = name,
+                sets = ex.positiveDoubleOrNull("sets")?.roundToInt()?.takeIf { it in 1..MAX_SETS },
+                target = ex.cleanString("target", MAX_TARGET_CHARS),
+                notes = ex.cleanString("notes", MAX_EXERCISE_NOTE_CHARS),
+            )
+        }
+        return DayDraft(
+            dayOfWeek = dayOfWeek,
+            title = dayObj.cleanString("title", MAX_TITLE_CHARS).ifEmpty { if (exercises.isEmpty()) "Rest" else "Training" },
+            isRest = dayObj.optBoolean("is_rest", exercises.isEmpty()),
+            exercises = exercises,
+        )
+    }
+
+    private fun dayOfWeekOrNull(value: String): DayOfWeek? {
+        val key = value.trim().uppercase().take(3)
+        return DayOfWeek.entries.firstOrNull { it.name.startsWith(key) && key.length == 3 }
+    }
+
+    /** A trimmed string field cut to [maxChars]; missing or JSON null becomes "". */
+    private fun JSONObject.cleanString(key: String, maxChars: Int): String =
+        if (isNull(key)) "" else optString(key, "").trim().take(maxChars)
 
     private fun extractJsonObject(text: String): String? {
         val withoutFences = text.replace("```json", "").replace("```", "")

@@ -24,3 +24,10 @@ fun formatDay(date: LocalDate, today: LocalDate = LocalDate.now()): String = whe
     today.minusDays(1) -> "Yesterday"
     else -> date.format(dayFormatter)
 }
+
+/** An exercise's prescription, e.g. "4 × 8-10 reps", "5 km easy pace" (no sets), or "3 sets". */
+fun formatPrescription(sets: Int?, target: String): String = when {
+    sets != null && target.isNotBlank() -> "$sets × ${target.trim()}"
+    sets != null -> if (sets == 1) "1 set" else "$sets sets"
+    else -> target.trim()
+}

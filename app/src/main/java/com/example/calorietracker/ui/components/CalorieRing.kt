@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.calorietracker.ui.formatKcal
+import com.example.calorietracker.ui.theme.tabular
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -47,7 +48,6 @@ import kotlin.math.sin
  * Calories eaten vs. the daily target. The filled part is one continuous arc whose colour
  * changes by macro (protein, carbs, fat), sized by the calories each one supplied
  * (4 / 4 / 9 kcal per gram). Tapping the ring swaps the centre text for the macro split.
- * Drawn in light tones for the dark gradient hero card.
  */
 @Composable
 fun CalorieRing(
@@ -76,9 +76,11 @@ fun CalorieRing(
     val fat by animateFloatAsState(share(fatKcal), animation, label = "fat")
     val unknown by animateFloatAsState(if (macroKcal > 0) 0f else fill, animation, label = "unknown")
 
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val neutralColor = MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = modifier
-            .size(220.dp)
+            .size(212.dp)
             .clip(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -89,12 +91,12 @@ fun CalorieRing(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 20.dp.toPx()
+            val strokeWidth = 16.dp.toPx()
             val inset = strokeWidth / 2
             val arcSize = size.copy(width = size.width - strokeWidth, height = size.height - strokeWidth)
             val topLeft = Offset(inset, inset)
             drawArc(
-                Color.White.copy(alpha = 0.14f), 0f, 360f, useCenter = false,
+                trackColor, 0f, 360f, useCenter = false,
                 topLeft = topLeft, size = arcSize, style = Stroke(strokeWidth),
             )
 
@@ -102,7 +104,7 @@ fun CalorieRing(
                 MacroColors.Protein to protein,
                 MacroColors.Carbs to carbs,
                 MacroColors.Fat to fat,
-                Color.White.copy(alpha = 0.85f) to unknown,
+                neutralColor to unknown,
             ).filter { it.second > 0.0005f }
             if (segments.isEmpty()) return@Canvas
 
@@ -141,24 +143,17 @@ fun CalorieRing(
 
 @Composable
 private fun RemainingKcal(eatenKcal: Int, targetKcal: Int, isOver: Boolean) {
-    val overColor = Color(0xFFFFB4B4)
+    val colors = MaterialTheme.colorScheme
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = formatKcal(abs(targetKcal - eatenKcal)),
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (isOver) overColor else Color.White,
+            style = MaterialTheme.typography.displayMedium.tabular(),
+            color = if (isOver) colors.error else colors.onSurface,
         )
         Text(
-            text = if (isOver) "kcal over" else "kcal left",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isOver) overColor else Color.White.copy(alpha = 0.85f),
-        )
-        Text(
-            text = "${formatKcal(eatenKcal)} / ${formatKcal(targetKcal)} eaten",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.7f),
+            text = if (isOver) "kcal over" else "kcal remaining",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isOver) colors.error else colors.onSurfaceVariant,
         )
     }
 }
@@ -178,19 +173,17 @@ private fun MacroSplit(proteinKcal: Double, carbsKcal: Double, fatKcal: Double) 
 private fun SplitRow(kcal: Double, total: Double, color: Color) {
     val percent = if (total > 0) (kcal / total * 100).roundToInt() else 0
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(12.dp).background(color, CircleShape))
+        Box(Modifier.size(10.dp).background(color, CircleShape))
         Spacer(Modifier.width(10.dp))
         Text(
             "${formatKcal(kcal.roundToInt())} kcal",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.width(92.dp),
+            style = MaterialTheme.typography.titleSmall.tabular(),
+            modifier = Modifier.width(84.dp),
         )
         Text(
             "$percent%",
-            style = MaterialTheme.typography.labelLarge,
-            color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.labelMedium.tabular(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

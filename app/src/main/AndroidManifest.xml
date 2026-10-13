@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reminders (water, meal logging, workouts). Asked for when a reminder is first turned on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- enableOnBackInvokedCallback="false" turns off the predictive back "peek" animation so the
          back gesture behaves exactly like the on-screen back arrow (same pop, same transition). -->
